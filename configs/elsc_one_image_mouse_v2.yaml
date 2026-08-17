@@ -1,0 +1,52 @@
+paths:
+  images_dir: /ems/elsc-labs/habib-n/segev.munitz/astroseg_data/test_images
+  checkpoint: /ems/elsc-labs/habib-n/tal.kupferman/Segmentation App/models/Astrocytes_Mouse_v2
+  cellprofiler_results_csv: /ems/elsc-labs/habib-n/segev.munitz/astrocyte_feature_extraction/reference/AstroResultsAstrocytes_with_nuclei.csv
+  cellprofiler_pipeline_dir: /ems/elsc-labs/habib-n/segev.munitz/astrocyte_feature_extraction/reference
+  cellprofiler_measurement_pipeline: /ems/elsc-labs/habib-n/segev.munitz/astrocyte_feature_extraction/cellprofiler/Astrocytes_CellposeLabels.cppipe
+  output_dir: /ems/elsc-labs/habib-n/segev.munitz/astroseg_data/outputs/astrocyte_feature_extraction/validation_one_image_mouse_v2
+
+images:
+  extensions: [".tif", ".tiff", ".ome.tif", ".ome.tiff"]
+  recursive: true
+  channel_axis: auto
+  expected_channels: 3
+  pixel_size_um: null
+  include_regex: '^ctrl_20x_Multichannel_20240318_437\.tif$'
+  max_images: 1
+
+cellpose:
+  expected_version: 3.1.1.1
+  gpu: true
+  resume: true
+  input_channel_indices: [1, 2]
+  normalize: true
+  diameter: null
+  flow_threshold: 0.4
+  cellprob_threshold: 0.0
+  min_size: 15
+
+crops:
+  margin_pixels: 16
+  write_article_64x64: true
+  article_size: 64
+  article_epsilon: 1.0e-5
+
+spatial:
+  k_neighbors: 6
+
+qc:
+  min_cell_area_pixels: 15
+  max_cell_area_pixels: null
+
+cellprofiler:
+  backend: direct
+  executable: /ems/elsc-labs/habib-n/segev.munitz/astrocyte_feature_extraction/.cpvenv/bin/cellprofiler
+  python_executable: /ems/elsc-labs/habib-n/segev.munitz/astrocyte_feature_extraction/.cpvenv/bin/python
+  direct_script: /ems/elsc-labs/habib-n/segev.munitz/astrocyte_feature_extraction/scripts/run_cellprofiler_direct.py
+  expected_version: 4.2.8
+  image_name: GFAP_Images
+  image_channel_index: 1
+  label_image_name: CellposeLabels
+  object_name: Cellpose_masks
+  allow_unpinned_version: false

@@ -1,0 +1,50 @@
+CellProfiler Pipeline: http://www.cellprofiler.org
+Version:5
+DateRevision:428
+GitHash:
+ModuleCount:4
+HasImagePlaneDetails:False
+
+LoadData:[module_num:1|svn_version:'Unknown'|variable_revision_number:6|show_window:False|notes:['Load one GFAP plane and the matching Cellpose integer labels.']|batch_state:array([], dtype=uint8)|enabled:True|wants_pause:False]
+    Input data file location:Default Input Folder|
+    Name of the file:load_data.csv
+    Load images based on this data?:Yes
+    Base image location:None|
+    Process just a range of rows?:No
+    Rows to process:1,100000
+    Group images by metadata?:No
+    Select metadata tags for grouping:None
+    Rescale intensities?:No
+
+MeasureObjectIntensity:[module_num:2|svn_version:'Unknown'|variable_revision_number:4|show_window:False|notes:[]|batch_state:array([], dtype=uint8)|enabled:True|wants_pause:False]
+    Select images to measure:GFAP_Images
+    Select objects to measure:Cellpose_masks
+
+MeasureObjectSizeShape:[module_num:3|svn_version:'Unknown'|variable_revision_number:3|show_window:False|notes:[]|batch_state:array([], dtype=uint8)|enabled:True|wants_pause:False]
+    Select object sets to measure:Cellpose_masks
+    Calculate the Zernike features?:Yes
+    Calculate the advanced features?:Yes
+
+ExportToSpreadsheet:[module_num:4|svn_version:'Unknown'|variable_revision_number:13|show_window:False|notes:[]|batch_state:array([], dtype=uint8)|enabled:True|wants_pause:False]
+    Select the column delimiter:Comma (",")
+    Add image metadata columns to your object data file?:Yes
+    Add image file and folder names to your object data file?:No
+    Select the measurements to export:Yes
+    Calculate the per-image mean values for object measurements?:No
+    Calculate the per-image median values for object measurements?:No
+    Calculate the per-image standard deviation values for object measurements?:No
+    Output file location:Default Output Folder|
+    Create a GenePattern GCT file?:No
+    Select source of sample row name:Metadata
+    Select the image to use as the identifier:None
+    Select the metadata to use as the identifier:None
+    Export all measurement types?:Yes
+    Press button to select measurements:Cellpose_masks|AreaShape_Zernike_6_2,Cellpose_masks|AreaShape_Zernike_6_4,Cellpose_masks|AreaShape_Zernike_6_0,Cellpose_masks|AreaShape_Zernike_6_6,Cellpose_masks|AreaShape_Zernike_4_0,Cellpose_masks|AreaShape_Zernike_4_4,Cellpose_masks|AreaShape_Zernike_4_2,Cellpose_masks|AreaShape_Zernike_3_1,Cellpose_masks|AreaShape_Zernike_3_3,Cellpose_masks|AreaShape_Zernike_7_7,Cellpose_masks|AreaShape_Zernike_7_1,Cellpose_masks|AreaShape_Zernike_7_3,Cellpose_masks|AreaShape_Zernike_7_5,Cellpose_masks|AreaShape_Zernike_9_7,Cellpose_masks|AreaShape_Zernike_9_3,Cellpose_masks|AreaShape_Zernike_9_9,Cellpose_masks|AreaShape_Zernike_9_1,Cellpose_masks|AreaShape_Zernike_9_5,Cellpose_masks|AreaShape_Zernike_5_1,Cellpose_masks|AreaShape_Zernike_5_5,Cellpose_masks|AreaShape_Zernike_5_3,Cellpose_masks|AreaShape_Zernike_8_4,Cellpose_masks|AreaShape_Zernike_8_6,Cellpose_masks|AreaShape_Zernike_8_2,Cellpose_masks|AreaShape_Zernike_8_8,Cellpose_masks|AreaShape_Zernike_8_0,Cellpose_masks|AreaShape_Zernike_0_0,Cellpose_masks|AreaShape_Zernike_2_0,Cellpose_masks|AreaShape_Zernike_2_2,Cellpose_masks|AreaShape_Zernike_1_1,Cellpose_masks|AreaShape_MaxFeretDiameter,Cellpose_masks|AreaShape_HuMoment_0,Cellpose_masks|AreaShape_HuMoment_5,Cellpose_masks|AreaShape_HuMoment_6,Cellpose_masks|AreaShape_HuMoment_4,Cellpose_masks|AreaShape_HuMoment_1,Cellpose_masks|AreaShape_HuMoment_2,Cellpose_masks|AreaShape_HuMoment_3,Cellpose_masks|AreaShape_MedianRadius,Cellpose_masks|AreaShape_InertiaTensor_1_0,Cellpose_masks|AreaShape_InertiaTensor_1_1,Cellpose_masks|AreaShape_InertiaTensor_0_1,Cellpose_masks|AreaShape_InertiaTensor_0_0,Cellpose_masks|AreaShape_Eccentricity,Cellpose_masks|AreaShape_BoundingBoxArea,Cellpose_masks|AreaShape_Solidity,Cellpose_masks|AreaShape_MeanRadius,Cellpose_masks|AreaShape_Compactness,Cellpose_masks|AreaShape_Extent,Cellpose_masks|AreaShape_MaximumRadius,Cellpose_masks|AreaShape_MajorAxisLength,Cellpose_masks|AreaShape_Center_X,Cellpose_masks|AreaShape_Center_Y,Cellpose_masks|AreaShape_FormFactor,Cellpose_masks|AreaShape_Area,Cellpose_masks|AreaShape_ConvexArea,Cellpose_masks|AreaShape_Perimeter,Cellpose_masks|AreaShape_EquivalentDiameter,Cellpose_masks|Intensity_MeanIntensity_GFAP_Images,Cellpose_masks|Intensity_IntegratedIntensity_GFAP_Images
+    Representation of Nan/Inf:NaN
+    Add a prefix to file names?:Yes
+    Filename prefix:AstroResults
+    Overwrite existing files without warning?:Yes
+    Data to export:Cellpose_masks
+    Combine these object measurements with those of the previous object?:No
+    File name:DATA.csv
+    Use the object name for the file name?:Yes
