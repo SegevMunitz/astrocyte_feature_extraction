@@ -1,0 +1,114 @@
+---
+title: "Astrocyte Morphology — ctrl vs 24h vs 72h"
+author: "Habib Lab"
+date: "`r format(Sys.Date())`"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+```
+
+# Overview
+
+Focused comparison of **ctrl**, **24h**, and **72h**. Processing matches the all-times notebook: 10–90% trimmed cell means and skeleton means per astrocyte.
+
+```{r libraries}
+library(tidyverse)
+library(pheatmap)
+source("astro_analysis_helpers.R")
+```
+
+```{r configuration}
+DATA_PATH <- "C:/Users/talku/OneDrive/Habib Lab/CellProfiler_Results/AstroResultsAstrocytes.csv"
+OUTPUT_ROOT <- "C:/Users/talku/OneDrive/Documents/HabibLab/output/ctrl_24h_72h"
+
+TIME_ORDER <- c("ctrl", "24h", "72h")
+USE_TRIMMED_MEANS <- TRUE
+TRIM_LOWER <- 0.10
+TRIM_UPPER <- 0.90
+TOP_N_FEATURES <- 12
+
+OUT <- make_output_folders(OUTPUT_ROOT, c("heatmaps", "stats"))
+TIME_COLORS <- get_time_colors(TIME_ORDER)
+```
+
+```{r load-and-process}
+cells_data <- load_astro_cells(DATA_PATH) %>%
+  filter(Time %in% TIME_ORDER)
+
+features <- identify_feature_columns(cells_data)
+image_metadata <- build_image_metadata(cells_data, TIME_ORDER)
+TIME_COLORS <- get_time_colors(levels(image_metadata$Time))
+
+image_means <- build_image_means(
+  cells_data = cells_data,
+  cell_features = features$cell,
+  skeleton_features = features$skeleton,
+  image_metadata = image_metadata,
+  use_trimmed = USE_TRIMMED_MEANS,
+  trim_lower = TRIM_LOWER,
+  trim_upper = TRIM_UPPER
+)
+
+mean_matrix <- feature_matrix(image_means, features$all)
+row_annotation <- data.frame(
+  Time = image_means$Time,
+  row.names = rownames(mean_matrix)
+)
+ann_colors <- list(Time = TIME_COLORS[levels(row_annotation$Time)])
+mean_method_label <- paste0(
+  TRIM_LOWER * 100, "–", TRIM_UPPER * 100,
+  "% trim + skeleton per cell, z-scored per feature"
+)
+
+cat("Images:", nrow(image_metadata), "\n")
+```
+
+```{r time-difference-features}
+time_feature_stats <- compute_time_feature_stats(
+  image_means = image_means,
+  feature_cols = features$all,
+  use_trimmed = USE_TRIMMED_MEANS,
+  trim_lower = TRIM_LOWER,
+  trim_upper = TRIM_UPPER
+)
+```
+
+```{r plot-discriminating-features}
+plot_time_feature_ranking(
+  time_feature_stats = time_feature_stats,
+  time_colors = TIME_COLORS,
+  n_features = 15,
+  file = file.path(OUT$stats, "discriminating_features.png"),
+  title = "Features that best separate ctrl, 24h, and 72h",
+  subtitle = paste0(
+    "Kruskal-Wallis ε² (", TRIM_LOWER * 100, "–", TRIM_UPPER * 100,
+    "% trim + skeleton per cell); dashed line = ε² 0.14"
+  )
+)
+```
+
+```{r heatmap-top-discriminating}
+top_features <- time_feature_stats %>%
+  head(TOP_N_FEATURES) %>%
+  pull(Feature)
+
+plot_image_heatmap(
+  scaled_mat = scale_features(mean_matrix[, top_features, drop = FALSE]),
+  row_ann = row_annotation,
+  ann_colors = ann_colors,
+  title = paste0(
+    "Top ", TOP_N_FEATURES, " discriminating features — ctrl / 24h / 72h\n(",
+    mean_method_label, ")"
+  ),
+  file = file.path(OUT$heatmaps, "top_discriminating.png"),
+  fontsize_row = 11,
+  fontsize_col = 11
+)
+
+cat("ctrl/24h/72h plots saved to:", OUTPUT_ROOT, "\n")
+```

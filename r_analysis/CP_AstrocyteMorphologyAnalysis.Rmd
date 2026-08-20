@@ -1,0 +1,257 @@
+---
+title: "Astrocyte Morphology Analysis"
+author: "Habib Lab"
+date: "`r format(Sys.Date())`"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+```
+
+# Overview
+
+This notebook analyzes **AstroResultsAstrocytes.csv** across all five time points (`ctrl`, `4h`, `24h`, `72h`, `7d`). Cell morphology/intensity uses **10–90% trimmed means** per image. Skeleton metrics are **means per astrocyte**.
+
+```{r libraries}
+library(tidyverse)
+library(pheatmap)
+source("astro_analysis_helpers.R")
+```
+
+```{r configuration}
+DATA_PATH <- "C:/Users/talku/OneDrive/Habib Lab/CellProfiler_Results/AstroResultsAstrocytes.csv"
+OUTPUT_ROOT <- "C:/Users/talku/OneDrive/Documents/HabibLab/output/all_times"
+
+TIME_ORDER <- c("ctrl", "4h", "24h", "72h", "7d")
+USE_TRIMMED_MEANS <- TRUE
+TRIM_LOWER <- 0.10
+TRIM_UPPER <- 0.90
+
+OUT <- make_output_folders(OUTPUT_ROOT, c("heatmaps", "stats", "boxplots"))
+TIME_COLORS <- get_time_colors(TIME_ORDER)
+```
+
+```{r load-and-process}
+cells_data <- load_astro_cells(DATA_PATH)
+features <- identify_feature_columns(cells_data)
+image_metadata <- build_image_metadata(cells_data, TIME_ORDER)
+TIME_COLORS <- get_time_colors(levels(image_metadata$Time))
+
+image_means <- build_image_means(
+  cells_data = cells_data,
+  cell_features = features$cell,
+  skeleton_features = features$skeleton,
+  image_metadata = image_metadata,
+  use_trimmed = USE_TRIMMED_MEANS,
+  trim_lower = TRIM_LOWER,
+  trim_upper = TRIM_UPPER
+)
+
+mean_matrix <- feature_matrix(image_means, features$all)
+mean_matrix_core <- mean_matrix[, features$core, drop = FALSE]
+row_annotation <- data.frame(
+  Time = image_means$Time,
+  row.names = rownames(mean_matrix)
+)
+ann_colors <- list(Time = TIME_COLORS[levels(row_annotation$Time)])
+mean_method_label <- paste0(
+  TRIM_LOWER * 100, "–", TRIM_UPPER * 100,
+  "% trim + skeleton per cell, z-scored per feature"
+)
+
+cat("Images:", nrow(image_metadata), "\n")
+cat("All features:", length(features$all), "\n")
+cat("Core features:", length(features$core), "\n")
+```
+
+# Heatmaps
+
+```{r heatmap-all-features}
+plot_image_heatmap(
+  scaled_mat = scale_features(mean_matrix),
+  row_ann = row_annotation,
+  ann_colors = ann_colors,
+  title = paste0("All features\n(", mean_method_label, ")"),
+  file = file.path(OUT$heatmaps, "all_features.png")
+)
+```
+
+```{r heatmap-core-features}
+plot_image_heatmap(
+  scaled_mat = scale_features(mean_matrix_core),
+  row_ann = row_annotation,
+  ann_colors = ann_colors,
+  title = paste0("Core features\n(", mean_method_label, ")"),
+  file = file.path(OUT$heatmaps, "core_features.png")
+)
+```
+
+```{r heatmap-cosine-all}
+plot_cosine_heatmap(
+  cosine_mat = cosine_similarity_matrix(mean_matrix),
+  title = "Cosine similarity — all features",
+  file = file.path(OUT$heatmaps, "cosine_all.png")
+)
+```
+
+```{r heatmap-cosine-core}
+plot_cosine_heatmap(
+  cosine_mat = cosine_similarity_matrix(mean_matrix_core),
+  title = "Cosine similarity — core features",
+  file = file.path(OUT$heatmaps, "cosine_core.png")
+)
+```
+
+# Feature ranking
+
+Kruskal–Wallis on image-level values; features ranked by ε² = `(H − k + 1) / (N − k)`.
+
+```{r time-difference-features}
+time_feature_stats <- compute_time_feature_stats(
+  image_means = image_means,
+  feature_cols = features$all,
+  use_trimmed = USE_TRIMMED_MEANS,
+  trim_lower = TRIM_LOWER,
+  trim_upper = TRIM_UPPER
+)
+
+core_time_stats <- compute_time_feature_stats(
+  image_means = image_means,
+  feature_cols = features$core,
+  use_trimmed = USE_TRIMMED_MEANS,
+  trim_lower = TRIM_LOWER,
+  trim_upper = TRIM_UPPER
+)
+```
+
+```{r plot-top25-kruskal}
+plot_time_feature_ranking(
+  time_feature_stats = time_feature_stats,
+  time_colors = TIME_COLORS,
+  n_features = 25,
+  file = file.path(OUT$stats, "top25_kruskal.png"),
+  title = "Top 25 features — Kruskal–Wallis ε²",
+  subtitle = paste0(
+    "Image-level values (", TRIM_LOWER * 100, "–", TRIM_UPPER * 100,
+    "% trim + skeleton per cell); dashed line = ε² 0.14"
+  )
+)
+```
+
+```{r plot-top25-h-pvalue}
+plot_top_features_h_pvalue(
+  time_feature_stats = time_feature_stats,
+  n_features = 25,
+  file = file.path(OUT$stats, "top25_h_pvalue.png"),
+  title = "Top 25 features — H statistic and p-value",
+  subtitle = "Ranked by ε²"
+)
+```
+
+# Selected heatmaps
+
+```{r heatmap-top10-plus-extras}
+feats_top10 <- select_top_plus_extras(time_feature_stats, n = 10)
+plot_image_heatmap(
+  scaled_mat = scale_features(feature_matrix(image_means, feats_top10)),
+  row_ann = row_annotation,
+  ann_colors = ann_colors,
+  title = "Top 10 features + skeleton + GFAP intensity",
+  file = file.path(OUT$heatmaps, "top10_plus_extras.png"),
+  fontsize_row = 10,
+  fontsize_col = 10
+)
+```
+
+```{r heatmap-cosine-dedup-core}
+feats_dedup_core <- dedup_features_by_cosine(
+  ranked_stats = core_time_stats,
+  feature_mat = mean_matrix,
+  candidate_features = core_time_stats$Feature[seq_len(min(20, nrow(core_time_stats)))],
+  cosine_threshold = 0.85,
+  force_include = SKELETON_INTENSITY_FEATURES
+)
+plot_image_heatmap(
+  scaled_mat = scale_features(feature_matrix(image_means, feats_dedup_core)),
+  row_ann = row_annotation,
+  ann_colors = ann_colors,
+  title = "Cosine-deduped core features (|r| < 0.85) + skeleton + intensity",
+  file = file.path(OUT$heatmaps, "cosine_dedup_core.png"),
+  fontsize_row = 10,
+  fontsize_col = 10
+)
+```
+
+```{r heatmap-skeleton-intensity}
+plot_image_heatmap(
+  scaled_mat = scale_features(feature_matrix(image_means, SKELETON_INTENSITY_FEATURES)),
+  row_ann = row_annotation,
+  ann_colors = ann_colors,
+  title = "Skeleton + GFAP integrated intensity",
+  file = file.path(OUT$heatmaps, "skeleton_intensity.png"),
+  fontsize_row = 10,
+  fontsize_col = 10
+)
+```
+
+```{r heatmap-final}
+feats_final <- c(
+  "AreaShape_MeanRadius",
+  "AreaShape_FormFactor",
+  "ObjectSkeleton_TotalObjectSkeletonLength_MorphologicalSkeleton",
+  "ObjectSkeleton_NumberNonTrunkBranches_MorphologicalSkeleton",
+  "Intensity_IntegratedIntensity_GFAP_Images"
+)
+mat_final <- log_transform_intensity_columns(feature_matrix(image_means, feats_final))
+plot_image_heatmap(
+  scaled_mat = scale_features(mat_final),
+  row_ann = row_annotation,
+  ann_colors = ann_colors,
+  title = "Final panel (MeanRadius, FormFactor, skeleton, log10 GFAP intensity)",
+  file = file.path(OUT$heatmaps, "final.png"),
+  fontsize_row = 10,
+  fontsize_col = 10
+)
+```
+
+# Boxplots
+
+Union of top-10-plus-extras and cosine-deduped core features, ordered by ε².
+
+```{r boxplots-final}
+all_stats <- bind_rows(time_feature_stats, core_time_stats) %>%
+  distinct(Feature, .keep_all = TRUE)
+
+boxplot_feats <- all_stats %>%
+  filter(Feature %in% c(feats_top10, feats_dedup_core)) %>%
+  arrange(desc(epsilon_squared)) %>%
+  pull(Feature)
+
+plot_time_boxplots(
+  image_means = image_means,
+  top_features = boxplot_feats[1:8],
+  time_colors = TIME_COLORS,
+  title = "Selected features 1–8",
+  subtitle = "Each dot = one image; ordered by Kruskal–Wallis ε²",
+  file = file.path(OUT$boxplots, "boxplots_1_8.png"),
+  width = 12,
+  height = 10
+)
+
+plot_time_boxplots(
+  image_means = image_means,
+  top_features = boxplot_feats[9:16],
+  time_colors = TIME_COLORS,
+  title = "Selected features 9–16",
+  subtitle = "Each dot = one image; ordered by Kruskal–Wallis ε²",
+  file = file.path(OUT$boxplots, "boxplots_9_16.png"),
+  width = 12,
+  height = 10
+)
+
+cat("All-times plots saved to:", OUTPUT_ROOT, "\n")
+```
