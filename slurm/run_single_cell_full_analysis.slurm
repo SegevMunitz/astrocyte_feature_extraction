@@ -10,6 +10,7 @@ set -euo pipefail
 
 ANALYSIS_ROOT="${ANALYSIS_ROOT:-/ems/elsc-labs/habib-n/segev.munitz/astroseg_data/analysis}"
 REPO_ROOT="${REPO_ROOT:-/ems/elsc-labs/habib-n/segev.munitz/astrocyte_feature_extraction}"
+SCRIPTS_DIR="${SCRIPTS_DIR:-$ANALYSIS_ROOT/scripts}"
 
 cd "$ANALYSIS_ROOT"
 mkdir -p logs
@@ -25,11 +26,42 @@ else
   exit 1
 fi
 
-python "$REPO_ROOT/scripts/measure_single_cell_crops_full.py" \
+if [[ ! -f "$SCRIPTS_DIR/measure_single_cell_crops_full.py" ]]; then
+  if [[ -f "$REPO_ROOT/scripts/measure_single_cell_crops_full.py" ]]; then
+    SCRIPTS_DIR="$REPO_ROOT/scripts"
+  else
+    echo "Could not find measure_single_cell_crops_full.py under:" >&2
+    echo "  $ANALYSIS_ROOT/scripts" >&2
+    echo "  $REPO_ROOT/scripts" >&2
+    exit 1
+  fi
+fi
+
+echo "Python: $(which python)"
+python -V
+python - <<'PY'
+import importlib.util
+import sys
+
+for package in ("cellprofiler", "cellprofiler_core", "sklearn", "matplotlib"):
+    spec = importlib.util.find_spec(package)
+    print(f"{package}: {'OK' if spec else 'MISSING'}")
+    if package.startswith("cellprofiler") and spec is None:
+        sys.exit("CellProfiler is required for measurement")
+PY
+
+echo "Scripts dir: $SCRIPTS_DIR"
+
+python "$SCRIPTS_DIR/measure_single_cell_crops_full.py" \
+  --analysis-root "$ANALYSIS_ROOT" \
+  --existing-features "$ANALYSIS_ROOT/results/single_cell_features_and_clusters.csv" \
+  --dry-run
+
+python "$SCRIPTS_DIR/measure_single_cell_crops_full.py" \
   --analysis-root "$ANALYSIS_ROOT" \
   --existing-features "$ANALYSIS_ROOT/results/single_cell_features_and_clusters.csv"
 
-python "$REPO_ROOT/scripts/single_cell_pca_analysis.py" \
+python "$SCRIPTS_DIR/single_cell_pca_analysis.py" \
   --input "$ANALYSIS_ROOT/results/single_cell_full_features.csv" \
   --output-dir "$ANALYSIS_ROOT/results/plots/per_cell_pca"
 
