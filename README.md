@@ -1,20 +1,62 @@
 # Astrocyte feature extraction
 
-Reproducible pipeline for:
+End-to-end pipeline on ELSC:
 
-1. segmenting static three-channel microscopy images with a custom Cellpose 3 checkpoint;
-2. exporting one black-background crop per segmented astrocyte;
-3. measuring the requested CellProfiler object features with the original, version-pinned pipeline;
-4. producing one feature vector and global position per cell; and
-5. exporting a same-image k-nearest-neighbor graph for future spatial models.
+**images → Cellpose (3-channel transfer, inference only) → single-cell crops → CellProfiler (+ skeleton) → frozen morph→RNA predict**
 
-Calcium time-series analysis, classifier training, feature attribution, and final visualization are intentionally outside this first pipeline.
+Optional FOV-level CellProfiler `measure` still exists for spatial tables / legacy `tables/cells.csv`, but the **RNA path uses crop-level features**, not FOV `cells.csv`.
 
-## Why CellProfiler remains the measurement backend
+Calcium time-series analysis and Cellpose training are outside this repo.
 
-The header of `AstroResultsAstrocytes_with_nuclei.csv` defines the requested column names, but it does not encode all settings needed to recalculate those values. Perimeters, intensity edges, texture quantization, Zernike moments, neighbors, and skeleton measurements are version- and pipeline-sensitive. This project therefore loads Cellpose integer labels as CellProfiler objects and runs the original measurement modules. Python code assembles and validates the outputs; it does not substitute approximate `scikit-image` formulas.
+## Unified path (preferred)
 
-## Installation on ELSC
+Self-contained cluster root (default):
+
+`/ems/elsc-labs/habib-n/segev.munitz/astrocyte_end_to_end/`
+
+Images stay on disk under `paths.images_dir` (not copied into ROOT). Weights, morph→RNA bundle, code, envs, logs, and outputs live under ROOT.
+
+Full stage notes: [`docs/UNIFIED_PIPELINE.md`](docs/UNIFIED_PIPELINE.md).
+
+### Stages
+
+| Stage | Role |
+|-------|------|
+| `inventory` | Discover 3-channel TIFFs; optionally skip incompatible channel counts |
+| `segment` | Cellpose 3ch transfer checkpoint |
+| `crops` | Per-cell crops + masks |
+| `crop_measure` | Crop CellProfiler SizeShape+Intensity + skeleton; cluster assigner → `tables/single_cell_full_features.csv` |
+| `predict_rna` | Frozen morph→RNA bundle; all FOVs (no Time drop); labeled accuracy when Time is known |
+| `measure` | Optional FOV CellProfiler → `tables/cells.csv` (not used for RNA) |
+| `run` | `inventory → segment → crops → crop_measure → predict_rna` |
+
+### Bootstrap once on ELSC
+
+```bash
+# Sync this repo to the cluster, then:
+bash tools/bootstrap_root.sh
+# Optional: ROOT=... REPO=... bash tools/bootstrap_root.sh
+# Refresh morph/bundle assets: bash tools/refresh_latest_assets.sh
+```
+
+Curated copies only (one Cellpose checkpoint, bundle, cluster table, code). Logs: `ROOT/logs/bootstrap_manifest.txt`.
+
+### Submit via Slurm (not the login node)
+
+```bash
+export ROOT=/ems/elsc-labs/habib-n/segev.munitz/astrocyte_end_to_end
+export CONFIG=$ROOT/configs/elsc_unified.yaml
+bash $ROOT/slurm/submit_pipeline.sh
+```
+
+Chain: `segment.sbatch` → `crop_measure.sbatch` → `predict_rna.sbatch` (`afterok`).  
+Logs: `$ROOT/logs/slurm/%x-%j.{out,err}`.
+
+Config: [`configs/elsc_unified.yaml`](configs/elsc_unified.yaml).
+
+After predict, check `rna_predictions/predicted_time.csv` (`true_time` vs `pred_time`) and `prediction_summary.json`.
+
+## Imaging-only install (this repo)
 
 ```bash
 git clone https://github.com/SegevMunitz/astrocyte_feature_extraction.git
@@ -25,41 +67,18 @@ python -m pip install --upgrade pip
 python -m pip install -e '.[segmentation,test]'
 ```
 
-The supplied checkpoint provenance pins Cellpose `3.1.1.1` with channel order
-`GFAP, GFP, DAPI`. The source CellProfiler pipeline uses format revision 428;
-the ELSC configuration pins CellProfiler `4.2.8`.
+Checkpoint provenance pins Cellpose `3.1.1.1` with training order `GFAP, GFP, DAPI`.  
+ELSC configs use `cellpose.input_channel_indices: [1, 2, 0]` and `cellprofiler.image_channel_index: 1` for the current TIFF export order. Revalidate if acquisition order changes.
 
-The current ELSC test TIFFs store GFAP at channel index `1`, not index `0`.
-`cellpose.input_channel_indices: [1, 2, 0]` maps their stored planes into the
-checkpoint's training order, and `cellprofiler.image_channel_index: 1` measures
-GFAP intensity from the original image. Revalidate both settings if the
-acquisition export order changes.
+CellProfiler measurement (FOV or crop) expects CellProfiler `4.2.8` in a separate `.cpvenv` (or ROOT `envs/.cpvenv`).
 
-## Configuration
+## Why CellProfiler remains the measurement backend
 
-Cluster paths and explicit inference settings are in [`configs/elsc.yaml`](configs/elsc.yaml). Before the measurement stage:
+The header of `AstroResultsAstrocytes_with_nuclei.csv` defines requested column names, but not all settings needed to recalculate them. This project loads Cellpose integer labels as CellProfiler objects and runs the original measurement modules. Python assembles outputs; it does not substitute approximate `scikit-image` formulas (except crop-level skeleton length / branch points used by morph→RNA).
 
-1. Run inventory.
-2. Inspect `manifests/cellprofiler_schema.json`.
-3. Set `cellprofiler.expected_version`.
-4. Set `paths.cellprofiler_measurement_pipeline` to a copy of the original pipeline that:
-   - preserves its preprocessing, calibration, nucleus association, and measurement settings;
-   - includes `LoadData`;
-   - loads `Image_ObjectsFileName_Astrocytes` / `Image_ObjectsPathName_Astrocytes` as integer objects; and
-   - exports the requested object table.
-5. If checkpoint provenance gives an exact Cellpose package version, set `cellpose.expected_version`.
+## Legacy imaging configs and commands
 
-The repository includes
-[`cellprofiler/Astrocytes_CellposeLabels.cppipe`](cellprofiler/Astrocytes_CellposeLabels.cppipe),
-generated from the source `Astrocytes_BMP.cppipe`. It replaces the source
-pipeline's obsolete two-channel segmentation with `LoadData`, while preserving
-the exact GFAP intensity and advanced size/shape measurement module settings.
-The pipeline measures every Cellpose label; the historical filename mentions
-nuclei, but its first-line feature schema contains no nucleus measurement.
-
-The pipeline fails rather than silently changing versions, channel count, channel axis, object count, or feature schema.
-
-## Commands
+Older absolute-path configs: [`configs/elsc.yaml`](configs/elsc.yaml), [`configs/elsc_one_image.yaml`](configs/elsc_one_image.yaml).
 
 ```bash
 astrocyte-pipeline inventory --config configs/elsc.yaml
@@ -67,58 +86,41 @@ astrocyte-pipeline segment --config configs/elsc.yaml
 astrocyte-pipeline crops --config configs/elsc.yaml
 astrocyte-pipeline spatial --config configs/elsc.yaml
 astrocyte-pipeline measure --config configs/elsc.yaml
+# or: astrocyte-pipeline run --config configs/elsc_unified.yaml
 ```
 
-After the measurement pipeline and versions are configured, the same stages can be run together:
-
-```bash
-astrocyte-pipeline run --config configs/elsc.yaml
-```
-
-For Slurm, submit the GPU stage followed by the dependent CPU measurement stage:
-
-```bash
-bash slurm/submit_pipeline.sh
-```
-
-Use [`configs/elsc_one_image.yaml`](configs/elsc_one_image.yaml) for the initial
-`ctrl_20x_Multichannel_20240318_437.tif` validation before processing the full
-directory.
-
-Override paths without editing scripts:
-
-```bash
-REPO_ROOT="$PWD" CONFIG="$PWD/configs/elsc.yaml" bash slurm/submit_pipeline.sh
-```
+The repository includes [`cellprofiler/Astrocytes_CellposeLabels.cppipe`](cellprofiler/Astrocytes_CellposeLabels.cppipe) for FOV measurement. The pipeline fails rather than silently changing versions, channel count, or feature schema.
 
 ## Cell crops
 
-Native crops retain only pixels belonging to the selected Cellpose label. All neighboring cells, background, and configurable margin pixels are black. Measurements use the full-resolution labels, not crops.
-
-The optional `*_article64.tif` output follows the cited pre-CNN preparation: convert to 8-bit, divide by 255, force-resize to 64×64 with nearest-neighbor behavior, then z-normalize each channel independently with epsilon `1e-5`. The configurable margin is a project choice; the paper did not define a crop buffer.
+Native crops retain only pixels belonging to the selected Cellpose label. Optional `*_article64.tif` follows the cited 64×64 z-normalized prep. **RNA morph features are measured on native crops**, not on FOV masks alone.
 
 ## Outputs
 
 Under the configured output directory:
 
-- `masks/`: lossless `uint32` Cellpose instance labels;
-- `qc/`: red-boundary overlays;
-- `cells/`: native cell-only crops, masks, and optional 64×64 tensors;
-- `tables/cells.csv` and `.parquet`: ordered CellProfiler metrics plus positions;
-- `tables/nodes.*`: one spatial node per cell;
-- `tables/edges.*`: directed same-image k-nearest-neighbor edges;
-- `manifests/`: image inventory, schema/module mapping, hashes, settings, and software provenance;
-- `cellprofiler/`: generated `LoadData` CSV, exact export, and execution log.
+- `masks/`: Cellpose instance labels;
+- `qc/`: overlays;
+- `cells/`: native cell crops and masks;
+- `tables/single_cell_full_features.csv`: crop-level morph matrix for RNA predict;
+- `rna_predictions/`: `predicted_time.csv`, `predicted_programs.csv`, `predicted_panel_genes.csv`, `prediction_summary.json`;
+- `tables/cells.csv` / `.parquet`: FOV CellProfiler metrics (optional `measure`);
+- `tables/nodes.*` / `edges.*`: spatial graph (optional);
+- `manifests/`: inventory, skipped images, schema, provenance;
+- `cellprofiler/`: FOV LoadData / export logs when using `measure`.
 
-Coordinates use image conventions: X is column, Y is row, and the origin is the upper-left. Physical coordinates are emitted only when OME metadata or `images.pixel_size_um` supplies calibration.
-Node rows also flag border contact, disconnected label fragments, and configurable minimum/maximum area violations. These are QC fields; objects are not silently discarded.
+## Morph→RNA notes
+
+- Frozen bundle: scaler + time classifier + RNA atlas (`model_bundle.joblib`, `rna_by_time.npz`). Prefer **nested** CV feature selection for production (honest ~92% time accuracy), not the leaky non-nested top-k (~98%).
+- Cluster mix (`frac_cluster_*`) comes from a frozen cell→cluster assigner when labels are missing.
+- Refitting after dropping a training sample: replace nested results + refit bundle (see `slurm/fit_bundle_ex72h2.slurm` pattern); then re-predict.
+
+Analysis scripts live under [`scripts/analysis/morph_to_rnaseq/`](scripts/analysis/morph_to_rnaseq/).
 
 ## Validation
-
-Run local unit tests:
 
 ```bash
 python -m pytest
 ```
 
-For numerical parity, run both the source CellProfiler pipeline and this project's measurement pipeline on the same input images and the same Cellpose integer labels. Compare by `(ImageNumber, ObjectNumber)` with `assert_numeric_parity`. The historical CSV is the schema oracle, not a numerical oracle when it was generated from different masks.
+For FOV numerical parity, compare CellProfiler exports by `(ImageNumber, ObjectNumber)` with `assert_numeric_parity` when masks match.
