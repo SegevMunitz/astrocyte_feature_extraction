@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-#SBATCH --job-name=astro-measure
+#SBATCH --job-name=astro-crop-measure
 #SBATCH --partition=elscn.q
 #SBATCH --cpus-per-task=16
 #SBATCH --mem=64G
-#SBATCH --time=12:00:00
+#SBATCH --time=24:00:00
 
 set -euo pipefail
 
@@ -15,5 +15,4 @@ cd "$REPO_ROOT"
 module load python/3.11.13 java/21.0.9
 source "${REPO_ROOT}/envs/.venv/bin/activate" 2>/dev/null || source "${REPO_ROOT}/.venv/bin/activate"
 
-# Optional FOV-level CellProfiler table (not used for RNA path)
-astrocyte-pipeline measure --config "$CONFIG"
+astrocyte-pipeline crop_measure --config "$CONFIG"

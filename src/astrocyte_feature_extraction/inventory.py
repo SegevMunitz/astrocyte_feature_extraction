@@ -148,16 +148,34 @@ def discover_images(config: dict[str, Any]) -> list[ImageRecord]:
         candidates = candidates[: int(maximum_images)]
     if not candidates:
         raise InventoryError(f"No configured TIFF images found below {root}")
-    return [
-        inspect_image(
-            path,
-            root,
-            image_config.get("channel_axis", "auto"),
-            int(image_config["expected_channels"]),
-            image_config.get("pixel_size_um"),
+    skip_incompatible = bool(image_config.get("skip_incompatible", False))
+    records: list[ImageRecord] = []
+    skipped: list[dict[str, str]] = []
+    for path in candidates:
+        try:
+            records.append(
+                inspect_image(
+                    path,
+                    root,
+                    image_config.get("channel_axis", "auto"),
+                    int(image_config["expected_channels"]),
+                    image_config.get("pixel_size_um"),
+                )
+            )
+        except InventoryError as exc:
+            if not skip_incompatible:
+                raise
+            skipped.append({"path": str(path), "reason": str(exc)})
+    if skip_incompatible and skipped:
+        skip_path = output_root / "manifests" / "skipped_images.json"
+        skip_path.parent.mkdir(parents=True, exist_ok=True)
+        skip_path.write_text(json.dumps(skipped, indent=2, sort_keys=True), encoding="utf-8")
+    if not records:
+        raise InventoryError(
+            f"No compatible TIFF images found below {root}"
+            + (f" ({len(skipped)} skipped)" if skipped else "")
         )
-        for path in candidates
-    ]
+    return records
 
 
 def write_inventory(records: list[ImageRecord], destination: Path) -> None:

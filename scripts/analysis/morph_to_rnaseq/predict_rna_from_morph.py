@@ -46,7 +46,12 @@ def fill_nan(x: np.ndarray) -> np.ndarray:
     return out
 
 
-def pool_cells(morph_csv: Path, wanted_morph: list[str], cell_feats: list[str]):
+def pool_cells(
+    morph_csv: Path,
+    wanted_morph: list[str],
+    cell_feats: list[str],
+    drop_unknown_time: bool = True,
+):
     features, by_feat, cell_images, cell_times, cell_clusters = read_cells(
         morph_csv, all_features=True, feature_names=cell_feats or None
     )
@@ -58,6 +63,7 @@ def pool_cells(morph_csv: Path, wanted_morph: list[str], cell_feats: list[str]):
         cell_clusters,
         collinear_thresh=None,
         wanted_cols=wanted_morph,
+        drop_unknown_time=drop_unknown_time,
     )
     cell_ok = np.array([t in TIME_ORDER for t in cell_times])
     cell_x = fill_nan(np.column_stack([by_feat[n] for n in features]))
@@ -153,7 +159,12 @@ def cmd_predict(args: argparse.Namespace) -> None:
     bundle_dir: Path = args.bundle_dir
     bundle = joblib.load(bundle_dir / "model_bundle.joblib")
     atlas = np.load(bundle_dir / "rna_by_time.npz", allow_pickle=True)
-    pooled = pool_cells(args.morph_csv, bundle["wanted_morph"], bundle["cell_feats"])
+    pooled = pool_cells(
+        args.morph_csv,
+        bundle["wanted_morph"],
+        bundle["cell_feats"],
+        drop_unknown_time=False,
+    )
     x = assemble_x(pooled, bundle["helper"], tuple(bundle["helper_times"]), bundle["model_cols"])
     proba = bundle["clf"].predict_proba(x)
     pred_idx = np.argmax(proba, axis=1)
@@ -164,15 +175,25 @@ def cmd_predict(args: argparse.Namespace) -> None:
     pred_prog = proba @ programs
     pred_genes = proba @ gene_vst
     times = list(TIME_ORDER)
+    true_times = [str(t) for t in pooled["y_img"]]
+    sample_ids = [str(s) for s in pooled["image_ids"]]
 
     out_dir = args.out_dir or (bundle_dir / "predictions")
     write_csv(
         out_dir / "predicted_time.csv",
-        ["slice", "pred_time"] + [f"P_{t}" for t in times],
+        ["slice", "sample", "true_time", "pred_time", "correct"]
+        + [f"P_{t}" for t in times],
         [
             {
                 "slice": i + 1,
+                "sample": sample_ids[i],
+                "true_time": true_times[i],
                 "pred_time": times[pred_idx[i]],
+                "correct": (
+                    ""
+                    if true_times[i] not in times
+                    else str(true_times[i] == times[pred_idx[i]]).lower()
+                ),
                 **{f"P_{times[k]}": proba[i, k] for k in range(len(times))},
             }
             for i in range(len(pred_idx))
@@ -180,10 +201,11 @@ def cmd_predict(args: argparse.Namespace) -> None:
     )
     write_csv(
         out_dir / "predicted_programs.csv",
-        ["slice", "pred_time"] + program_names,
+        ["slice", "sample", "pred_time"] + program_names,
         [
             {
                 "slice": i + 1,
+                "sample": sample_ids[i],
                 "pred_time": times[pred_idx[i]],
                 **{program_names[j]: pred_prog[i, j] for j in range(len(program_names))},
             }
@@ -192,20 +214,34 @@ def cmd_predict(args: argparse.Namespace) -> None:
     )
     write_csv(
         out_dir / "predicted_panel_genes.csv",
-        ["slice", "pred_time"] + genes,
+        ["slice", "sample", "pred_time"] + genes,
         [
             {
                 "slice": i + 1,
+                "sample": sample_ids[i],
                 "pred_time": times[pred_idx[i]],
                 **{genes[j]: pred_genes[i, j] for j in range(len(genes))},
             }
             for i in range(len(pred_idx))
         ],
     )
-    print(json.dumps({"n_slices": int(len(pred_idx)), "out": str(out_dir)}))
+    labeled = [i for i, t in enumerate(true_times) if t in times]
+    n_correct = sum(1 for i in labeled if true_times[i] == times[pred_idx[i]])
+    accuracy = (n_correct / len(labeled)) if labeled else None
+    summary = {
+        "n_slices": int(len(pred_idx)),
+        "n_labeled": int(len(labeled)),
+        "n_correct": int(n_correct) if labeled else None,
+        "accuracy_labeled": accuracy,
+        "out": str(out_dir),
+    }
+    (out_dir / "prediction_summary.json").write_text(
+        json.dumps(summary, indent=2), encoding="utf-8"
+    )
+    print(json.dumps(summary))
     for i in range(min(5, len(pred_idx))):
         print(
-            f"slice {i+1}: {times[pred_idx[i]]}  "
+            f"{sample_ids[i]}: true={true_times[i]} pred={times[pred_idx[i]]}  "
             + " ".join(f"{t}={proba[i,k]:.2f}" for k, t in enumerate(times))
         )
 

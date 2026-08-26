@@ -14,6 +14,7 @@ from .cellprofiler_features import (
     run_cellprofiler,
 )
 from .config import ConfigError, load_config, output_path
+from .crop_measure import CropMeasureError, run_crop_measure, run_predict_rna
 from .crops import export_all_crops
 from .inventory import ImageRecord, discover_images, write_inventory
 from .provenance import write_run_manifest
@@ -27,7 +28,6 @@ from .schema import (
 )
 from .segmentation import segment_all
 from .spatial import build_spatial_tables
-
 
 def _context(
     config: dict[str, Any],
@@ -172,39 +172,49 @@ def run_all(config_path: Path) -> None:
     write_run_manifest(config, records, output_root, config_path)
     masks = segment_all(records, config, output_root)
     export_all_crops(records, masks, output_root, config["crops"])
-    nodes, edges = build_spatial_tables(
-        records, masks, output_root, config["spatial"], config["qc"]
-    )
-    _select_measurement_pipeline(config, metrics, pipelines)
-    measurements, _ = run_cellprofiler(
-        config, records, masks, metrics, output_root
-    )
-    table = assemble_cell_table(
-        measurements,
-        nodes,
-        records,
-        [metric.column for metric in metrics],
-        output_root,
-    )
+    morph_csv = run_crop_measure(config)
+    rna_dir = run_predict_rna(config)
     print(
-        f"Complete: {len(records)} images, {len(table)} cells, "
-        f"{len(edges)} directed spatial edges"
+        f"Complete: {len(records)} images → morph {morph_csv.name} → RNA {rna_dir}"
     )
+
+
+def run_crop_measure_stage(config_path: Path) -> None:
+    config = load_config(config_path)
+    morph_csv = run_crop_measure(config)
+    print(f"Wrote crop-level morph features: {morph_csv}")
+
+
+def run_predict_rna_stage(config_path: Path) -> None:
+    config = load_config(config_path)
+    out_dir = run_predict_rna(config)
+    print(f"Wrote RNA predictions: {out_dir}")
 
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="astrocyte-pipeline",
-        description="Segment astrocytes and produce exact CellProfiler feature vectors.",
+        description=(
+            "Images → Cellpose → crops → crop CellProfiler/skeleton → RNA predict."
+        ),
     )
     parser.add_argument(
         "stage",
-        choices=("inventory", "segment", "crops", "spatial", "measure", "run"),
+        choices=(
+            "inventory",
+            "segment",
+            "crops",
+            "spatial",
+            "measure",
+            "crop_measure",
+            "predict_rna",
+            "run",
+        ),
     )
     parser.add_argument(
         "--config",
         type=Path,
-        default=Path("configs/elsc.yaml"),
+        default=Path("configs/elsc_unified.yaml"),
         help="YAML pipeline configuration",
     )
     return parser
@@ -218,11 +228,13 @@ def main(argv: list[str] | None = None) -> int:
         "crops": run_crops,
         "spatial": run_spatial,
         "measure": run_measure,
+        "crop_measure": run_crop_measure_stage,
+        "predict_rna": run_predict_rna_stage,
         "run": run_all,
     }
     try:
         functions[args.stage](args.config)
-    except (ConfigError, RuntimeError, OSError, ValueError) as exc:
+    except (ConfigError, CropMeasureError, RuntimeError, OSError, ValueError) as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
         return 2
     return 0

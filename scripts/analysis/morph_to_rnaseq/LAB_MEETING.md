@@ -147,7 +147,30 @@ Dio2, Slco1c1, Thy1, Nnat. Late maturation / thyroid hormone axis — flat early
 
 ## Next use (after the meeting)
 
-Predict on new morphology only:
+### Cluster rule (ELSC)
+
+**Always `sbatch`** morph→RNA / evaluation / prediction jobs. Do **not** run long `python ...` on the login node.
+
+Project root on cluster: `/ems/elsc-labs/habib-n/segev.munitz/morph_to_rnaseq`  
+Venv: `$ROOT/.venv`  
+Slurm scripts (repo): `scripts/analysis/morph_to_rnaseq/slurm/` → sync to `$ROOT/scripts/slurm/`.
+
+```bash
+cd /ems/elsc-labs/habib-n/segev.munitz/morph_to_rnaseq
+
+# Refresh frozen RNA atlas + refit bundle
+sbatch scripts/slurm/refresh_rna_atlas.slurm
+
+# Predict on new morphology only
+MORPH_CSV=/path/to/NEW_CELLS.csv \
+OUT_DIR=/path/to/pred_out \
+sbatch scripts/slurm/predict_rna_from_morph.slurm
+
+# Optional: fit-only
+MODE=fit sbatch scripts/slurm/predict_rna_from_morph.slurm
+```
+
+Local-style CLI (compute node / Slurm job only):
 
 ```bash
 python predict_rna_from_morph.py predict \

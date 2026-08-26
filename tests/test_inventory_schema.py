@@ -22,6 +22,40 @@ def test_inventory_reads_channel_axis(tmp_path: Path) -> None:
     assert (record.height, record.width) == (12, 16)
 
 
+def test_discover_skips_incompatible_channels(tmp_path: Path) -> None:
+    import numpy as np
+    import tifffile
+    from astrocyte_feature_extraction.inventory import discover_images
+
+    good = tmp_path / "good.tif"
+    write_test_image(good)
+    bad = tmp_path / "bad.tif"
+    tifffile.imwrite(
+        bad,
+        np.zeros((2, 8, 8), dtype=np.uint16),
+        metadata={"axes": "CYX"},
+        photometric="minisblack",
+    )
+    out = tmp_path / "out"
+    out.mkdir()
+    config = {
+        "paths": {"images_dir": str(tmp_path), "output_dir": str(out)},
+        "images": {
+            "extensions": [".tif"],
+            "recursive": False,
+            "channel_axis": "auto",
+            "expected_channels": 3,
+            "skip_incompatible": True,
+            "include_regex": None,
+            "max_images": None,
+        },
+    }
+    records = discover_images(config)
+    assert len(records) == 1
+    skipped = out / "manifests" / "skipped_images.json"
+    assert skipped.is_file()
+
+
 def test_schema_maps_columns_and_pipeline_modules(tmp_path: Path) -> None:
     csv_path = tmp_path / "objects.csv"
     csv_path.write_text(

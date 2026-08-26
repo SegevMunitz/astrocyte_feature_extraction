@@ -219,10 +219,16 @@ def image_rows(
     clusters: np.ndarray,
     collinear_thresh: float | None = 0.9,
     wanted_cols: list[str] | None = None,
+    drop_unknown_time: bool = True,
 ) -> tuple[list[str], np.ndarray, np.ndarray, np.ndarray, list[str]]:
     unique_images = sorted(set(images.tolist()), key=str)
-    cluster_levels = sorted({c for c in clusters.tolist() if str(c) != ""}, key=str)
+    cluster_levels = {c for c in clusters.tolist() if str(c) != ""}
     wanted = set(wanted_cols) if wanted_cols is not None else None
+    if wanted is not None:
+        for name in wanted_cols or []:
+            if name.startswith("frac_cluster_"):
+                cluster_levels.add(name[len("frac_cluster_") :])
+    cluster_levels = sorted(cluster_levels, key=str)
     col_names: list[str] = []
     for name in features:
         median_name = f"median_{name}"
@@ -247,8 +253,10 @@ def image_rows(
         mask = images == image
         time_vals = times[mask]
         time = Counter(time_vals.tolist()).most_common(1)[0][0]
-        if time not in TIME_ORDER:
+        if drop_unknown_time and time not in TIME_ORDER:
             continue
+        if not time:
+            time = "unknown"
         vals_by_feat = {name: by_feat[name][mask] for name in features}
         n = int(mask.sum())
         cl = clusters[mask]

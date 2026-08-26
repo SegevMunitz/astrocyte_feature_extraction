@@ -1,19 +1,37 @@
 #!/usr/bin/env bash
+# Submit unified chain: segment(+crops) → crop_measure → predict_rna
+# All Slurm logs under $ROOT/logs/slurm/
 set -euo pipefail
 
-REPO_ROOT="${REPO_ROOT:-$(pwd)}"
-CONFIG="${CONFIG:-$REPO_ROOT/configs/elsc.yaml}"
+ROOT="${ROOT:-/ems/elsc-labs/habib-n/segev.munitz/astrocyte_end_to_end}"
+CONFIG="${CONFIG:-$ROOT/configs/elsc_unified.yaml}"
+LOGDIR="${LOGDIR:-$ROOT/logs/slurm}"
+mkdir -p "$LOGDIR"
 
 segment_job="$(
   sbatch --parsable \
-    --export="ALL,REPO_ROOT=$REPO_ROOT,CONFIG=$CONFIG" \
-    "$REPO_ROOT/slurm/segment.sbatch"
+    --output="$LOGDIR/%x-%j.out" \
+    --error="$LOGDIR/%x-%j.err" \
+    --export="ALL,REPO_ROOT=$ROOT,CONFIG=$CONFIG,ROOT=$ROOT" \
+    "$ROOT/slurm/segment.sbatch"
 )"
-measurement_job="$(
+crop_job="$(
   sbatch --parsable \
     --dependency="afterok:$segment_job" \
-    --export="ALL,REPO_ROOT=$REPO_ROOT,CONFIG=$CONFIG" \
-    "$REPO_ROOT/slurm/measure.sbatch"
+    --output="$LOGDIR/%x-%j.out" \
+    --error="$LOGDIR/%x-%j.err" \
+    --export="ALL,REPO_ROOT=$ROOT,CONFIG=$CONFIG,ROOT=$ROOT" \
+    "$ROOT/slurm/crop_measure.sbatch"
+)"
+predict_job="$(
+  sbatch --parsable \
+    --dependency="afterok:$crop_job" \
+    --output="$LOGDIR/%x-%j.out" \
+    --error="$LOGDIR/%x-%j.err" \
+    --export="ALL,REPO_ROOT=$ROOT,CONFIG=$CONFIG,ROOT=$ROOT" \
+    "$ROOT/slurm/predict_rna.sbatch"
 )"
 
-printf 'Segmentation job: %s\nMeasurement job: %s\n' "$segment_job" "$measurement_job"
+printf 'ROOT: %s\nCONFIG: %s\nLOGDIR: %s\n' "$ROOT" "$CONFIG" "$LOGDIR"
+printf 'Segmentation(+crops) job: %s\nCrop-measure job: %s\nPredict-RNA job: %s\n' \
+  "$segment_job" "$crop_job" "$predict_job"

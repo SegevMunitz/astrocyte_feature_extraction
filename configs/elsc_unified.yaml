@@ -1,0 +1,73 @@
+# Unified end-to-end config (ROOT-relative assets + external images_dir).
+# Do NOT point images_dir at Drive-only folders until you intentionally run them.
+# Submit: ROOT=... CONFIG=$ROOT/configs/elsc_unified.yaml bash $ROOT/slurm/submit_pipeline.sh
+#
+# Stages: inventory → segment → crops → crop_measure → predict_rna
+
+paths:
+  # Set ROOT env when submitting; relative paths resolve against ROOT.
+  root: /ems/elsc-labs/habib-n/segev.munitz/astrocyte_end_to_end
+  # Existing FOVs on disk — not copied into ROOT. Exclude Drive FOVs via include_regex if needed.
+  images_dir: /ems/elsc-labs/habib-n/segev.munitz/astroseg_data/test_images
+  checkpoint: models/cellpose/cellpose_3ch_lr_0p003_epoch_0250
+  cellprofiler_results_csv: reference/AstroResultsAstrocytes_with_nuclei.csv
+  cellprofiler_pipeline_dir: reference
+  cellprofiler_measurement_pipeline: cellprofiler/Astrocytes_CellposeLabels.cppipe
+  output_dir: outputs/runs/default
+  bundle_dir: models/morph_to_rnaseq/bundle
+  cluster_assigner: models/morph_to_rnaseq/cluster_assigner.joblib
+  cluster_csv: models/morph_to_rnaseq/single_cell_features_and_clusters.csv
+  # Latest crop-level matrix (copied into ROOT at bootstrap/refresh)
+  morph_csv_reference: models/morph_to_rnaseq/single_cell_full_features.csv
+  crop_measure_script: scripts/analysis/measure_single_cell_crops_full.py
+  slurm_log_dir: logs/slurm
+
+images:
+  extensions: [".tif", ".tiff", ".ome.tif", ".ome.tiff"]
+  recursive: true
+  channel_axis: auto
+  expected_channels: 3
+  skip_incompatible: true
+  pixel_size_um: null
+  # Keep Multichannel + optional BMP4; do not expand to Drive-only folders yet.
+  include_regex: null
+  max_images: null
+
+cellpose:
+  expected_version: 3.1.1.1
+  gpu: true
+  resume: true
+  input_channel_indices: [1, 2, 0]
+  normalize: true
+  diameter: null
+  flow_threshold: 0.4
+  cellprob_threshold: 0.0
+  min_size: 15
+
+crops:
+  margin_pixels: 16
+  write_article_64x64: true
+  article_size: 64
+  article_epsilon: 1.0e-5
+
+crop_measure:
+  workers: 8
+
+spatial:
+  k_neighbors: 6
+
+qc:
+  min_cell_area_pixels: 15
+  max_cell_area_pixels: null
+
+cellprofiler:
+  backend: direct
+  executable: envs/.cpvenv/bin/cellprofiler
+  python_executable: envs/.cpvenv/bin/python
+  direct_script: scripts/run_cellprofiler_direct.py
+  expected_version: 4.2.8
+  image_name: GFAP_Images
+  image_channel_index: 1
+  label_image_name: CellposeLabels
+  object_name: Cellpose_masks
+  allow_unpinned_version: false
