@@ -1,0 +1,160 @@
+{
+  "n_slices": 52,
+  "n_programs": 14,
+  "programs": {
+    "BMP_Id": {
+      "pearson": 0.8882021419224446,
+      "mae": 0.4452566198730624
+    },
+    "cell_cycle": {
+      "pearson": 0.9404886905414098,
+      "mae": 0.38665767287315106
+    },
+    "reactive_GFAP": {
+      "pearson": 0.8942995571220314,
+      "mae": 0.3980951759518176
+    },
+    "notch_fate": {
+      "pearson": 0.8142818574155957,
+      "mae": 0.32910841036767763
+    },
+    "late_7d": {
+      "pearson": 0.9552823998134592,
+      "mae": 0.2741946494373523
+    },
+    "cytoskeleton": {
+      "pearson": 0.9383618431266927,
+      "mae": 0.26223698366560105
+    },
+    "MHC_class_I": {
+      "pearson": 0.8985049097021047,
+      "mae": 0.31214340721856176
+    },
+    "Stat3_reactive": {
+      "pearson": 0.8752345784035723,
+      "mae": 0.40223915585321646
+    },
+    "complement": {
+      "pearson": 0.8956350997487007,
+      "mae": 0.2230939151458518
+    },
+    "interferon_response": {
+      "pearson": 0.9117917823673007,
+      "mae": 0.3614709235720914
+    },
+    "astrocyte_identity": {
+      "pearson": 0.8894527122976214,
+      "mae": 0.3169682637211552
+    },
+    "glutamate_ion": {
+      "pearson": 0.8732941332666898,
+      "mae": 0.28224067833161964
+    },
+    "OPC_pdgfra": {
+      "pearson": 0.9475811491060422,
+      "mae": 0.16362273007340328
+    },
+    "ECM_remodeling": {
+      "pearson": 0.9169120074675831,
+      "mae": 0.28401177208458406
+    }
+  },
+  "mean_pearson": 0.9028087758786608,
+  "program_genes_used": {
+    "BMP_Id": [
+      "Id1",
+      "Id3",
+      "Smad6",
+      "Smad7",
+      "Nog"
+    ],
+    "cell_cycle": [
+      "Mki67",
+      "Top2a",
+      "Ccna2",
+      "Cdk1",
+      "Rrm2",
+      "Pcna"
+    ],
+    "reactive_GFAP": [
+      "Gfap",
+      "Vim",
+      "Aqp4",
+      "Serpina3n",
+      "Lcn2"
+    ],
+    "notch_fate": [
+      "Dll1",
+      "Olig2",
+      "Sox10"
+    ],
+    "late_7d": [
+      "Dio2",
+      "Slco1c1",
+      "Thy1",
+      "Nnat"
+    ],
+    "cytoskeleton": [
+      "Vim",
+      "Nes",
+      "Actg1",
+      "Cfl1",
+      "Tubb2a",
+      "Map1b",
+      "Rhoa",
+      "Rock1"
+    ],
+    "MHC_class_I": [
+      "H2-D1",
+      "H2-K1",
+      "B2m",
+      "Tap1"
+    ],
+    "Stat3_reactive": [
+      "Stat3",
+      "Lcn2",
+      "Serpina3n"
+    ],
+    "complement": [
+      "C3",
+      "C4b",
+      "C1qa",
+      "C1qb",
+      "C1qc"
+    ],
+    "interferon_response": [
+      "Stat1",
+      "Isg15",
+      "Ifit1",
+      "Irf7",
+      "Oasl2"
+    ],
+    "astrocyte_identity": [
+      "Aldh1l1",
+      "S100b",
+      "Sox9"
+    ],
+    "glutamate_ion": [
+      "Slc1a2",
+      "Slc1a3",
+      "Kcnj10",
+      "Gja1",
+      "Glul"
+    ],
+    "OPC_pdgfra": [
+      "Pdgfra",
+      "Cspg4",
+      "Gpr17"
+    ],
+    "ECM_remodeling": [
+      "Col11a2",
+      "Col4a1",
+      "Sparc",
+      "Fn1",
+      "Timp3",
+      "Mmp14"
+    ]
+  },
+  "programs_dropped": [],
+  "note": "Predicted program = P(time|morph) mixed with frozen bulk VST program scores. Morph\u2192time was not retrained."
+}

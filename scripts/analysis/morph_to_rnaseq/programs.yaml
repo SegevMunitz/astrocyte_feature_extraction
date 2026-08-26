@@ -1,0 +1,102 @@
+# Frozen RNA program library for morph → time → bulk atlas mixing.
+# Scores = mean VST of genes in set, z-scored across wells, averaged by time.
+# include: always = keep on dashboard; if_expressed = keep only if ≥3 genes
+# are in the VST matrix and the time course is non-flat.
+
+BMP_Id:
+  description: "BMP/SMAD direct targets and negative feedback"
+  source: "DE scan + BMP literature"
+  include: always
+  genes: [Id1, Id3, Smad6, Smad7, Nog]
+  overlap_with: []
+
+cell_cycle:
+  description: "Proliferation / S–G2–M"
+  source: "DE scan (transient 24h arrest)"
+  include: always
+  genes: [Mki67, Top2a, Ccna2, Cdk1, Rrm2, Pcna]
+  overlap_with: []
+
+reactive_GFAP:
+  description: "Reactive / injury-like astrocyte structure and acute-phase genes"
+  source: "Astrocyte panel + DE (Gfap transient mid-course)"
+  include: always
+  genes: [Gfap, Vim, Aqp4, Serpina3n, Lcn2]
+  overlap_with: [cytoskeleton, Stat3_reactive]
+
+notch_fate:
+  description: "Notch ligand plus oligodendrocyte-lineage transcription factors"
+  source: "DE scan (Dll1 sustained down; Olig2 early down)"
+  include: always
+  genes: [Dll1, Olig2, Sox10]
+  overlap_with: [OPC_pdgfra]
+
+late_7d:
+  description: "Late maturation / thyroid hormone axis"
+  source: "DE scan (late-only genes)"
+  include: always
+  genes: [Dio2, Slco1c1, Thy1, Nnat]
+  overlap_with: []
+
+cytoskeleton:
+  description: "Intermediate filaments plus actin/microtubule/Rho-ROCK remodeling"
+  source: "Morphology link (branching, Zernike, process shape); IF overlap with reactive_GFAP"
+  include: always
+  genes: [Vim, Nes, Actg1, Cfl1, Tubb2a, Map1b, Rhoa, Rock1]
+  overlap_with: [reactive_GFAP]
+
+MHC_class_I:
+  description: "MHC class I antigen presentation"
+  source: "summarize_contrasts.py panel"
+  include: always
+  genes: [H2-D1, H2-K1, B2m, Tap1]
+  overlap_with: []
+
+Stat3_reactive:
+  description: "IL-6–Stat3 reactive signaling hub (not structural GFAP)"
+  source: "Panel (Stat3, Lcn2, Serpina3n) + A1-like literature"
+  include: always
+  genes: [Stat3, Lcn2, Serpina3n, Saa3]
+  overlap_with: [reactive_GFAP]
+
+complement:
+  description: "Astrocyte-produced complement (innate)"
+  source: "Neuroinflammation literature; include only if expressed in BMP50 VST"
+  include: if_expressed
+  genes: [C3, C4b, C1qa, C1qb, C1qc]
+  overlap_with: []
+
+interferon_response:
+  description: "Type I interferon / antiviral program (distinct from Stat3)"
+  source: "IFN literature; include only if expressed in BMP50 VST"
+  include: if_expressed
+  genes: [Stat1, Isg15, Ifit1, Irf7, Oasl2]
+  overlap_with: []
+
+astrocyte_identity:
+  description: "Homeostatic astrocyte lineage markers (not functional uptake machinery)"
+  source: "summarize_contrasts.py panel"
+  include: always
+  genes: [Aldh1l1, S100b, Sox9]
+  overlap_with: []
+
+glutamate_ion:
+  description: "Glutamate uptake, K+ siphoning, and gap junctions"
+  source: "Astrocyte physiology; morphologically relevant to process territory"
+  include: always
+  genes: [Slc1a2, Slc1a3, Kcnj10, Gja1, Glul]
+  overlap_with: []
+
+OPC_pdgfra:
+  description: "OPC / NG2-cell compartment markers"
+  source: "Panel; split from notch_fate (Pdgfra moved here)"
+  include: always
+  genes: [Pdgfra, Cspg4, Gpr17]
+  overlap_with: [notch_fate]
+
+ECM_remodeling:
+  description: "Extracellular matrix / basement-membrane remodeling"
+  source: "Col11a2 from DE flip-gene scan + common astrocyte ECM genes"
+  include: always
+  genes: [Col11a2, Col4a1, Sparc, Fn1, Timp3, Mmp14]
+  overlap_with: []
