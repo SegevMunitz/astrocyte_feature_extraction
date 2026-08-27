@@ -10,6 +10,7 @@ Downstream R analysis of CellProfiler / single-cell astrocyte feature tables. Th
 | `CP_AstrocyteMorphologyAnalysis.Rmd` | All five time points (`ctrl`, `4h`, `24h`, `72h`, `7d`) |
 | `CP_AstrocyteMorphology_3Conditions.Rmd` | Focused `ctrl` / `24h` / `72h` comparison |
 | `CP_SingleCellFeaturesHeatmap.R` | Heatmap for `single_cell_features_and_clusters.csv` |
+| `CP_IntensityBoxplots.R` | Intensity-only Time boxplots from `AstroResultsAstrocytes_with_nuclei.csv` |
 
 ## Requirements
 
